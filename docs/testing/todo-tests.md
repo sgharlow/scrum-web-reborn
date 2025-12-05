@@ -3,9 +3,29 @@
 **Last Updated**: 2025-11-15 16:30  
 **Status**: ✅ COMPLETE - 113/113 Tests Passing (100% pass rate)
 
-## 📋 Recent Changes (2025-11-15)
+## 📋 Recent Changes (2025-12-05)
 
-### ✅ Latest Update - Timing Test Fixed (2025-11-15 16:30)
+### 🔄 Latest Update - Average Vote Rounding Added (2025-12-05)
+- **File**: `infra/lambda/tally/index.ts`
+- **Change**: Added rounding to 1 decimal place for average vote calculation (line 271)
+- **Before**: `avgVote = sum / count` (e.g., 5.333333333...)
+- **After**: `avgVote = Math.round((sum / count) * 10) / 10` (e.g., 5.3)
+- **Reason**: Consistency in UI display, prevents floating-point precision issues
+- **Impact**: 
+  - Vote Tally Latency ≤2s SLI (no performance impact)
+  - UI displays cleaner values (5.3 instead of 5.333333333)
+  - Existing tests need update for new precision
+- **Test Status**: ⚠️ NEEDS VERIFICATION
+  - Backend: 26/26 tests (need to verify rounding in BACKEND-TALLY-006)
+  - Frontend: 87/87 tests (no changes needed)
+- **SLI Impact**: Vote Tally Latency ≤2s (calculation still <2s)
+- **Next Steps**:
+  1. Add new test case for rounding edge cases (BACKEND-TALLY-012)
+  2. Update BACKEND-TALLY-006 assertion to expect 5.3 instead of 5.33
+  3. Run backend tests to verify all pass
+  4. Add E2E test to verify UI displays rounded values
+
+### ✅ Previous Update - Timing Test Fixed (2025-11-15 16:30)
 - **File**: `hooks/__tests__/useAuth.test.ts`
 - **Change**: Increased delay from 1ms to 5ms in uniqueness test (line 75)
 - **Reason**: Ensures different timestamps between consecutive `generateUsername()` calls
@@ -91,31 +111,29 @@
   - ✅ Authentication flows - VALIDATED (all auth tests passing)
 - **Total**: 113 automated tests passing (100% pass rate)
 
-### 🔜 Next Steps - HACKATHON SUBMISSION READY
-1. ✅ **COMPLETE**: Unit tests for `generateUsername()` function (17 tests: HOOK-AUTH-008 through HOOK-AUTH-013 + uniqueness)
-   - ✅ Function exported from useAuth.ts - tests executable
-   - ✅ All edge cases covered: standard email, special chars, short emails, fallback, uniqueness (5ms delay), truncation
-   - ✅ ALL TESTS PASSING
-2. ✅ **COMPLETE**: Retry logic tests (3/3 tests: HOOK-AUTH-014, HOOK-AUTH-015, HOOK-AUTH-016)
-   - ✅ HOOK-AUTH-014: Successful retry after collision
-   - ✅ HOOK-AUTH-015: Failure after max retries
-   - ✅ HOOK-AUTH-016: Non-collision error handling
-   - ✅ ALL TESTS PASSING
-3. ✅ **COMPLETE**: All useAuth tests passing (35/35)
-   - ✅ Username generation: 17/17 passing
-   - ✅ Sign-in/sign-up: 6/6 passing
-   - ✅ Token management: 4/4 passing
-   - ✅ Retry logic: 6/6 passing
-   - ✅ Error handling: 2/2 passing
-4. ✅ **COMPLETE**: All tests passing (113/113, 100% pass rate)
-   - ✅ Frontend: 87/87 passing (<4s execution)
-   - ✅ Backend: 26/26 passing (<1s execution)
-5. 🎬 **NEXT**: Take screenshots for submission (30 minutes)
-   - Sign-in page, room lobby, voting interface, vote results, Kiro specs folder
-6. 🎬 **NEXT**: Record demo video (1 hour)
-   - Follow script in `docs/hackathon/DEMO-VIDEO-OUTLINE-SCRIPT.md`
-7. 🎬 **NEXT**: Upload to YouTube and submit to Devpost (30 minutes)
-   - Total time to submission: ~2 hours
+### 🔜 Next Steps - Test Updates for Rounding Change
+1. 🔴 **URGENT**: Update BACKEND-TALLY-006 test assertion (5 minutes)
+   - File: `infra/lambda/tally/__tests__/tally.test.ts` (line ~70)
+   - Change: `toBeCloseTo(5.33, 1)` → `toBe(5.3)`
+   - Verify test passes after update
+2. 🔴 **HIGH**: Add BACKEND-TALLY-012 rounding edge case test (30 minutes)
+   - Test cases: [1,2]→1.5, [1,2,3]→2.0, [5,5,6]→5.3, [8,8,9]→8.3, [1,1,1,2]→1.2
+   - Validates consistent rounding behavior across vote combinations
+3. 🟡 **MEDIUM**: Run all backend tests (5 minutes)
+   - Command: `npm run test:backend -- tally.test.ts`
+   - Expected: 11/11 tests passing (10 existing + 1 new)
+   - Verify no other tests affected by rounding change
+4. 🟡 **MEDIUM**: Run all tests to verify 100% pass rate (10 minutes)
+   - Command: `npm run test:all`
+   - Expected: 114/114 tests passing (113 existing + 1 new)
+5. ✅ **COMPLETE**: All previous test work
+   - ✅ Username generation tests: 17/17 passing
+   - ✅ Retry logic tests: 3/3 passing
+   - ✅ All useAuth tests: 35/35 passing
+   - ✅ Frontend tests: 87/87 passing
+   - ✅ Backend tests: 26/26 passing (needs verification after rounding change)
+6. 🎬 **FUTURE**: Media creation for hackathon submission
+   - Screenshots and demo video (after tests verified)
 
 ### 📊 Test Coverage Impact
 - **Before Username Change**: 93 tests passing (100% pass rate)
@@ -124,36 +142,59 @@
   - ✅ 3 retry logic tests PASSING (HOOK-AUTH-014, HOOK-AUTH-015, HOOK-AUTH-016)
   - ✅ All existing tests updated and passing
   - ✅ Timing test fixed (5ms delay ensures unique timestamps)
-- **Current Status**: 113/113 tests passing (100% pass rate)
+- **After Rounding Change (2025-12-05)**: 113 tests → 114 tests (1 new test added)
+  - ⚠️ 1 test needs update: BACKEND-TALLY-006 (assertion change for rounding)
+  - 🔴 1 new test needed: BACKEND-TALLY-012 (rounding edge cases)
+  - ⚠️ Verification needed: Run tests to confirm all pass
+- **Current Status**: ⚠️ 113/113 tests (needs update for rounding change)
+- **Target Status**: 114/114 tests passing (100% pass rate)
 - **Execution Time**: <5 seconds total (Frontend: <4s, Backend: <1s)
-- **Status**: 🎉 **READY FOR HACKATHON SUBMISSION**
+- **Status**: 🟡 **MINOR UPDATES NEEDED - Then ready for submission**
 
 ---
 
 ## 🚨 Current Blockers
 
-### ✅ NO BLOCKERS - ALL TESTS PASSING
+### ⚠️ MINOR UPDATE NEEDED - Average Vote Rounding
 
-**Status**: 🎉 **100% COMPLETE - READY FOR SUBMISSION**
+**Status**: 🟡 **1 TEST UPDATE + 1 NEW TEST NEEDED**
+
+**Recent Code Change (2025-12-05)**:
+- ✅ Implementation: Average vote rounding added to tally Lambda
+- ⚠️ Test Impact: BACKEND-TALLY-006 needs assertion update
+- 🔴 New Test: BACKEND-TALLY-012 needed for rounding edge cases
+
+**Action Items**:
+1. 🔴 **URGENT**: Update BACKEND-TALLY-006 test assertion
+   - File: `infra/lambda/tally/__tests__/tally.test.ts` (line ~70)
+   - Change: `toBeCloseTo(5.33, 1)` → `toBe(5.3)`
+   - Reason: Rounding now produces 5.3 instead of 5.33
+2. 🔴 **HIGH**: Add BACKEND-TALLY-012 test for rounding edge cases
+   - Test cases: [1,2]→1.5, [1,2,3]→2.0, [5,5,6]→5.3, [8,8,9]→8.3, [1,1,1,2]→1.2
+   - Validates consistent rounding behavior
+3. 🟡 **MEDIUM**: Run backend tests to verify all pass
+   - Command: `npm run test:backend -- tally.test.ts`
+   - Expected: 11/11 tests passing (10 existing + 1 new)
+
+**Test Results (Before Update)**:
+- Frontend: 87/87 passing (<4s execution)
+- Backend: 26/26 passing (<1s execution) - ⚠️ May fail due to rounding change
+- Total: 113/113 passing (100% pass rate) - ⚠️ Needs verification
 
 **All Previous Blockers Resolved**:
-- ✅ HOOK-AUTH-016: Non-collision error handling test → COMPLETE (test written and passing)
-- ✅ Timing test: Username uniqueness → FIXED (5ms delay ensures different timestamps)
-- ✅ INFRA-001B: AWS SDK version mismatch → RESOLVED (tests pass with current setup)
-- ✅ INFRA-012: Tally test imports → RESOLVED (all 10 tests passing)
-- ✅ INFRA-013: Mutations test imports → RESOLVED (all 16 tests passing)
+- ✅ HOOK-AUTH-016: Non-collision error handling test → COMPLETE
+- ✅ Timing test: Username uniqueness → FIXED (5ms delay)
+- ✅ INFRA-001B: AWS SDK version mismatch → RESOLVED
+- ✅ INFRA-012: Tally test imports → RESOLVED
+- ✅ INFRA-013: Mutations test imports → RESOLVED
 - ✅ Frontend tests → RESOLVED (all 87 tests passing)
-- ✅ Backend tests → RESOLVED (all 26 tests passing)
 - ✅ AuthFlow validation → RESOLVED (all 24 tests passing)
 
-**Test Results**:
-- Frontend: 87/87 passing (<4s execution)
-- Backend: 26/26 passing (<1s execution)
-- Total: 113/113 passing (100% pass rate)
-
-**Remaining Work (Non-Technical)**:
+**Remaining Work**:
+- 🔴 Update test assertions for rounding (15 minutes)
+- 🔴 Add rounding edge case tests (30 minutes)
+- 🟡 Verify all tests pass (5 minutes)
 - 🎬 Media creation for hackathon submission (screenshots + video)
-- 📝 Optional: Implement E2E test scenarios (infrastructure ready, not required)
 
 ## Overview
 
@@ -466,12 +507,15 @@ These tests directly validate our reliability commitments.
   - **Test File**: `infra/lambda/tally/__tests__/tally.test.ts`
   - **SLI Impact**: Vote Tally Latency ≤2s (edge case for large teams)
 
-- [ ] **BACKEND-TALLY-006**: Computes correct numeric average
-  - **Status**: 🟢 Test written, imports fixed (INFRA-012), ready to run
-  - **Acceptance**: Votes [3, 5, 8] → avgVote = 5.33
+- [ ] **BACKEND-TALLY-006**: Computes correct numeric average with rounding
+  - **Status**: ⚠️ NEEDS UPDATE (2025-12-05 - Rounding added)
+  - **Acceptance**: Votes [3, 5, 8] → avgVote = 5.3 (rounded to 1 decimal place)
+  - **Before**: Expected 5.33 (2 decimal places)
+  - **After**: Expect 5.3 (1 decimal place) due to `Math.round((sum / count) * 10) / 10`
   - **Dependencies**: None (mocks DynamoDB)
-  - **Test File**: `infra/lambda/tally/__tests__/tally.test.ts`
+  - **Test File**: `infra/lambda/tally/__tests__/tally.test.ts` (line ~70)
   - **SLI Impact**: Vote Tally Latency ≤2s (core business logic)
+  - **Action Required**: Update assertion from `toBeCloseTo(5.33, 1)` to `toBe(5.3)`
 
 - [ ] **BACKEND-TALLY-007**: Excludes special cards from average
   - **Status**: 🟢 Test written, imports fixed (INFRA-012), ready to run
@@ -507,6 +551,21 @@ These tests directly validate our reliability commitments.
   - **Dependencies**: None (mocks DynamoDB)
   - **Test File**: `infra/lambda/tally/__tests__/tally.test.ts`
   - **SLI Impact**: Vote Tally Latency ≤2s (error handling)
+
+- [ ] **BACKEND-TALLY-012**: Rounding edge cases for average calculation
+  - **Status**: 🔴 NEW TEST NEEDED (2025-12-05)
+  - **Priority**: HIGH
+  - **Acceptance**: 
+    - Votes [1, 2] → avgVote = 1.5 (no rounding needed)
+    - Votes [1, 2, 3] → avgVote = 2.0 (rounds to 2.0, not 2)
+    - Votes [5, 5, 6] → avgVote = 5.3 (5.333... → 5.3)
+    - Votes [8, 8, 9] → avgVote = 8.3 (8.333... → 8.3)
+    - Votes [1, 1, 1, 2] → avgVote = 1.2 (1.25 → 1.2)
+    - Votes [1, 1, 1, 1, 2] → avgVote = 1.2 (1.2 exact)
+  - **Dependencies**: None (mocks DynamoDB)
+  - **Test File**: `infra/lambda/tally/__tests__/tally.test.ts` (new test case)
+  - **SLI Impact**: Vote Tally Latency ≤2s (validates rounding consistency)
+  - **Reason**: Ensures rounding behavior is consistent and predictable across all vote combinations
 
 ---
 
@@ -1026,7 +1085,87 @@ These tests directly validate our reliability commitments.
 
 ## 🔗 Interface Changes Detected (From Recent Edits)
 
-### Username Generation Added to useAuth Hook (2025-11-15 - LATEST)
+### Average Vote Rounding Added to Tally Lambda (2025-12-05 - LATEST)
+
+**File**: `infra/lambda/tally/index.ts`
+
+**Changes**:
+1. Modified `computeAggregates()` function - Added rounding to average vote calculation
+   - **Line**: 271
+   - **Before**: `avgVote = numericVotes.reduce((sum, val) => sum + val, 0) / numericVotes.length`
+   - **After**: `avgVote = Math.round((numericVotes.reduce((sum, val) => sum + val, 0) / numericVotes.length) * 10) / 10`
+   - **Purpose**: Round average to 1 decimal place for consistency
+   - **Algorithm**:
+     - Calculate sum / count (e.g., 16/3 = 5.333...)
+     - Multiply by 10 (5.333... * 10 = 53.333...)
+     - Round to nearest integer (Math.round(53.333...) = 53)
+     - Divide by 10 (53 / 10 = 5.3)
+   - **Examples**:
+     - [3, 5, 8] → 16/3 = 5.333... → 5.3
+     - [5, 8] → 13/2 = 6.5 → 6.5 (no change)
+     - [1, 2, 3] → 6/3 = 2.0 → 2.0
+     - [5, 5, 6] → 16/3 = 5.333... → 5.3
+     - [1, 1, 1, 2] → 5/4 = 1.25 → 1.2
+
+**Impact on Testing**:
+- **Critical**: BACKEND-TALLY-006 needs assertion update
+  - Current: `toBeCloseTo(5.33, 1)` expects 2 decimal places
+  - Required: `toBe(5.3)` expects 1 decimal place
+- **New Test Required**: BACKEND-TALLY-012 for rounding edge cases
+  - Test various vote combinations to validate consistent rounding
+  - Ensure no floating-point precision issues
+- **Integration Points**:
+  - DynamoDB story updates (avgVote field stored with 1 decimal)
+  - GraphQL subscriptions (clients receive rounded values)
+  - UI display (shows cleaner values like "5.3" instead of "5.333333333")
+- **SLI Impact**: 
+  - **Vote Tally Latency ≤2s**: No performance impact (rounding is O(1))
+  - **Data Consistency**: All clients see same rounded value
+  - **User Experience**: Cleaner UI display, no floating-point artifacts
+
+**Test Coverage Required**:
+- ⚠️ Unit Tests: Update BACKEND-TALLY-006 assertion (5 minutes)
+  - File: `infra/lambda/tally/__tests__/tally.test.ts` (line ~70)
+  - Change: `toBeCloseTo(5.33, 1)` → `toBe(5.3)`
+- 🔴 Unit Tests: Add BACKEND-TALLY-012 for rounding edge cases (30 minutes)
+  - Test cases: [1,2]→1.5, [1,2,3]→2.0, [5,5,6]→5.3, [8,8,9]→8.3, [1,1,1,2]→1.2
+  - Validates Math.round() behavior across different vote combinations
+- 🟡 Integration Tests: Verify DynamoDB stores rounded values
+  - Query story after votes cast, verify avgVote has 1 decimal place
+- 🟡 E2E Tests: Verify UI displays rounded values
+  - Cast votes, reveal, verify displayed average matches expected rounding
+
+**Backward Compatibility**:
+- ✅ Existing data unaffected (avgVote recalculated on each vote change)
+- ✅ GraphQL schema unchanged (avgVote is Float type, supports 1 decimal)
+- ✅ UI unchanged (already displays avgVote as-is)
+- ✅ No database migration needed (values recomputed on next vote)
+
+**Error Handling**:
+- No new error cases introduced (rounding cannot fail)
+- Existing null handling preserved (all special cards → avgVote = null)
+- Existing empty vote handling preserved (no votes → avgVote = null)
+
+**Performance Impact**:
+- Negligible: Math.round() is O(1) operation
+- No additional DynamoDB queries or updates
+- Vote Tally Latency ≤2s SLI still met
+
+**Next Actions**:
+1. 🔴 **URGENT**: Update BACKEND-TALLY-006 test assertion (5 minutes)
+   - Change expected value from 5.33 to 5.3
+2. 🔴 **HIGH**: Add BACKEND-TALLY-012 test for rounding edge cases (30 minutes)
+   - Cover various vote combinations to validate rounding
+3. 🟡 **MEDIUM**: Run backend tests to verify all pass (5 minutes)
+   - Command: `npm run test:backend -- tally.test.ts`
+   - Expected: 11/11 tests passing
+4. 🟡 **MEDIUM**: Run all tests to verify 100% pass rate (10 minutes)
+   - Command: `npm run test:all`
+   - Expected: 114/114 tests passing
+
+---
+
+### Username Generation Added to useAuth Hook (2025-11-15)
 
 **File**: `hooks/useAuth.ts`
 
