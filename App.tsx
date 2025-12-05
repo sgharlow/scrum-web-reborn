@@ -556,13 +556,13 @@ const CollaborationProvider: React.FC<{
                             id: story.id,
                             title: story.title,
                             description: story.description || '',
-                            estimate: story.avgVote?.toString()
+                            estimate: story.avgVote ? (Number.isInteger(story.avgVote) ? story.avgVote.toString() : story.avgVote.toFixed(1)) : undefined
                         }
                     });
                     if (story.revealed && story.avgVote) {
                         localDispatch({
                             type: 'SET_ESTIMATE',
-                            payload: { storyId: story.id, estimate: story.avgVote.toString() }
+                            payload: { storyId: story.id, estimate: Number.isInteger(story.avgVote) ? story.avgVote.toString() : story.avgVote.toFixed(1) }
                         });
                     }
                 });
@@ -707,7 +707,7 @@ const CollaborationProvider: React.FC<{
                     if (story.avgVote) {
                         localDispatch({
                             type: 'SET_ESTIMATE',
-                            payload: { storyId: story.id, estimate: story.avgVote.toString() }
+                            payload: { storyId: story.id, estimate: Number.isInteger(story.avgVote) ? story.avgVote.toString() : story.avgVote.toFixed(1) }
                         });
                     }
                 }
@@ -745,7 +745,7 @@ const CollaborationProvider: React.FC<{
                 if (story.avgVote) {
                     localDispatch({
                         type: 'SET_ESTIMATE',
-                        payload: { storyId: story.id, estimate: story.avgVote.toString() }
+                        payload: { storyId: story.id, estimate: Number.isInteger(story.avgVote) ? story.avgVote.toString() : story.avgVote.toFixed(1) }
                     });
                 }
             },

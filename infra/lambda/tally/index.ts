@@ -265,9 +265,10 @@ function computeAggregates(votes: VoteRecord[], logger: Logger): VoteAggregates 
     .filter((value) => !isNaN(value));
 
   // Calculate average, or null if no numeric votes
+  // Round to 1 decimal place for consistency
   const avgVote =
     numericVotes.length > 0
-      ? numericVotes.reduce((sum, val) => sum + val, 0) / numericVotes.length
+      ? Math.round((numericVotes.reduce((sum, val) => sum + val, 0) / numericVotes.length) * 10) / 10
       : null;
 
   logger.info('aggregates.computed', {
