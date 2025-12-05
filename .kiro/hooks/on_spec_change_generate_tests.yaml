@@ -1,0 +1,67 @@
+name: on_spec_change_generate_tests
+description: "Auto-generate integration tests when domain/flow specs change"
+version: 1
+
+trigger:
+  type: file_change
+  paths:
+    - .kiro/specs/domain.yaml
+    - .kiro/specs/flows.yaml
+  debounce: 5s  # Wait for multiple saves to settle
+
+conditions:
+  - "git status --porcelain shows changes"
+  - "changes are not in a merge conflict state"
+
+actions:
+  - name: validate_specs
+    description: "Lint and validate YAML schema"
+    command: kiro validate specs
+    on_failure: halt_pipeline
+
+  - name: generate_graphql_schema
+    description: "Generate GraphQL schema from domain.yaml"
+    command: kiro generate graphql --from domain.yaml --out infra/graphql/schema.graphql
+    on_failure: warn_and_continue
+
+  - name: generate_integration_tests
+    description: "Create test stubs for each flow"
+    command: kiro generate tests --from flows.yaml --framework jest --out infra/tests/integration/
+    on_failure: warn_and_continue
+
+  - name: run_tests
+    description: "Run test suite to ensure no regressions"
+    command: npm test --prefix infra
+    timeout: 120s
+    on_failure: warn_and_continue
+
+  - name: build_infrastructure
+    description: "Compile TypeScript and bundle Lambdas"
+    command: npm run build --prefix infra
+    timeout: 180s
+    on_failure: halt_pipeline
+
+  - name: cdk_synth
+    description: "Synthesize CloudFormation to catch errors early"
+    command: npm run cdk:synth --prefix infra
+    timeout: 120s
+    on_failure: halt_pipeline
+
+outputs:
+  - type: log
+    path: .kiro/logs/spec-change-{timestamp}.log
+
+  - type: notification
+    channel: slack
+    message: "Specs updated and validated. Build: {{status}}"
+    on: [success, failure]
+
+  - type: metric
+    name: spec_validation_duration_ms
+    value: "{{total_duration}}"
+    destination: cloudwatch
+
+metadata:
+  author: kiro-automation
+  category: quality-assurance
+  tags: [ci, testing, codegen]

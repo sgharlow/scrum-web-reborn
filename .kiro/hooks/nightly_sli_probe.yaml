@@ -1,0 +1,258 @@
+name: nightly_sli_probe
+description: "Synthetic end-to-end test to measure SLIs and verify 99% uptime"
+version: 1
+
+trigger:
+  type: schedule
+  cron: "0 7 * * ? *"  # 07:00 UTC daily (before business hours)
+
+environment:
+  GRAPHQL_ENDPOINT: "{{env.APPSYNC_API_URL}}"
+  COGNITO_USER_POOL_ID: "{{env.COGNITO_USER_POOL_ID}}"
+  COGNITO_CLIENT_ID: "{{env.COGNITO_CLIENT_ID}}"
+  PROBE_USER_EMAIL: "probe-bot@scrum-reborn.local"
+  PROBE_USER_PASSWORD: "{{secret.PROBE_PASSWORD}}"
+
+actions:
+  - name: authenticate_probe_user
+    description: "Get Cognito ID token for API calls"
+    script: |
+      TOKEN=$(aws cognito-idp initiate-auth \
+        --auth-flow USER_PASSWORD_AUTH \
+        --client-id $COGNITO_CLIENT_ID \
+        --auth-parameters USERNAME=$PROBE_USER_EMAIL,PASSWORD=$PROBE_USER_PASSWORD \
+        --query 'AuthenticationResult.IdToken' \
+        --output text)
+      echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+    timeout: 10s
+    on_failure: halt_pipeline
+
+  - name: test_create_room
+    description: "SLI: Room creation latency"
+    graphql:
+      endpoint: "{{env.GRAPHQL_ENDPOINT}}"
+      headers:
+        Authorization: "Bearer {{env.TOKEN}}"
+      query: |
+        mutation CreateProbeRoom {
+          createRoom(
+            name: "Nightly Probe Room"
+            code: "PROBE{{timestamp}}"
+            sprint: "probe"
+          ) {
+            id
+            name
+            code
+            createdAt
+          }
+        }
+    capture:
+      room_id: "response.data.createRoom.id"
+      latency_ms: "response.timing.duration"
+    assert:
+      - "response.status == 200"
+      - "latency_ms < 500"
+    on_failure: log_and_continue
+
+  - name: test_join_room
+    description: "SLI: Join room connectivity success rate"
+    graphql:
+      endpoint: "{{env.GRAPHQL_ENDPOINT}}"
+      headers:
+        Authorization: "Bearer {{env.TOKEN}}"
+      query: |
+        mutation JoinProbeRoom {
+          joinRoom(
+            roomCode: "{{captured.code}}"
+            displayName: "Probe Bot"
+            role: MEMBER
+          ) {
+            userId
+            displayName
+            state
+          }
+        }
+    capture:
+      join_latency_ms: "response.timing.duration"
+    assert:
+      - "response.status == 200"
+      - "response.data.joinRoom.state == 'ONLINE'"
+      - "join_latency_ms < 2000"
+    on_failure: increment_failure_count
+
+  - name: test_subscribe_to_room
+    description: "SLI: Pub/sub subscription establishment"
+    websocket:
+      endpoint: "{{env.GRAPHQL_ENDPOINT}}/graphql"
+      headers:
+        Authorization: "Bearer {{env.TOKEN}}"
+      subscribe: |
+        subscription OnRoomEvent {
+          onRoomEvent(roomId: "{{captured.room_id}}") {
+            ... on StoryEvent {
+              type
+              story { id title }
+            }
+          }
+        }
+      timeout: 5000
+    capture:
+      subscription_latency_ms: "response.timing.duration"
+    assert:
+      - "response.status == 200"
+      - "subscription_latency_ms < 3000"
+    on_failure: increment_failure_count
+
+  - name: test_create_story_and_pubsub
+    description: "SLI: Mutation-to-subscription latency (p95 target: <250ms)"
+    sequence:
+      - step: mutation
+        graphql:
+          query: |
+            mutation CreateProbeStory {
+              createStory(
+                roomId: "{{captured.room_id}}"
+                title: "Probe Story"
+                description: "Synthetic monitoring test"
+              ) {
+                id
+                title
+                createdAt
+              }
+            }
+        capture:
+          mutation_timestamp: "Date.now()"
+          story_id: "response.data.createStory.id"
+
+      - step: wait_for_subscription_event
+        websocket:
+          await_message:
+            type: "StoryEvent"
+            story_id: "{{captured.story_id}}"
+          timeout_ms: 2000
+        capture:
+          event_timestamp: "Date.now()"
+          pubsub_latency_ms: "{{captured.event_timestamp - captured.mutation_timestamp}}"
+
+    assert:
+      - "captured.pubsub_latency_ms < 250"
+    on_failure: log_and_continue
+
+  - name: test_voting_flow
+    description: "SLI: Vote tally latency (p95 target: <2s)"
+    sequence:
+      - step: cast_vote
+        graphql:
+          query: |
+            mutation CastProbeVote {
+              castVote(
+                roomId: "{{captured.room_id}}"
+                storyId: "{{captured.story_id}}"
+                value: "5"
+              ) {
+                id
+                value
+                createdAt
+              }
+            }
+        capture:
+          vote_timestamp: "Date.now()"
+
+      - step: poll_for_tally_update
+        graphql:
+          query: |
+            query GetStoryAggregates {
+              getStory(
+                roomId: "{{captured.room_id}}"
+                storyId: "{{captured.story_id}}"
+              ) {
+                voteCount
+                avgVote
+              }
+            }
+          poll:
+            interval_ms: 200
+            max_attempts: 10
+            until: "response.data.getStory.voteCount > 0"
+        capture:
+          tally_complete_timestamp: "Date.now()"
+          tally_latency_ms: "{{captured.tally_complete_timestamp - captured.vote_timestamp}}"
+
+    assert:
+      - "captured.tally_latency_ms < 2000"
+    on_failure: log_and_continue
+
+  - name: cleanup_probe_room
+    description: "Delete test data"
+    graphql:
+      query: |
+        mutation CleanupProbe {
+          leaveRoom(roomId: "{{captured.room_id}}")
+        }
+    on_failure: warn_only
+
+  - name: publish_sli_metrics
+    description: "Write results to Domo for dashboards"
+    script: |
+      curl -X POST "{{env.DOMO_API_ENDPOINT}}/v2/datasets/{{env.SLI_DATASET_ID}}/data" \
+        -H "Authorization: Bearer {{env.DOMO_ACCESS_TOKEN}}" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "timestamp": "{{now}}",
+          "sli_name": "connectivity_success_rate",
+          "value": {{metrics.success_rate}},
+          "target": 99.5,
+          "status": "{{metrics.success_rate >= 99.5 ? 'green' : 'red'}}"
+        }'
+    timeout: 30s
+
+metrics:
+  success_rate:
+    formula: "(1 - (failure_count / total_assertions)) * 100"
+    unit: percentage
+
+  avg_latency:
+    formula: "average([join_latency_ms, pubsub_latency_ms, tally_latency_ms])"
+    unit: milliseconds
+
+outputs:
+  - type: cloudwatch_metric
+    namespace: ScrumReborn/SLI
+    metrics:
+      - name: NightlyProbeSuccessRate
+        value: "{{metrics.success_rate}}"
+        unit: Percent
+
+      - name: PubSubLatencyP95
+        value: "{{captured.pubsub_latency_ms}}"
+        unit: Milliseconds
+
+      - name: TallyLatencyP95
+        value: "{{captured.tally_latency_ms}}"
+        unit: Milliseconds
+
+  - type: notification
+    channel: slack
+    condition: "metrics.success_rate < 99.5 OR any_assertion_failed"
+    message: |
+      🚨 Nightly SLI Probe Alert
+      Success Rate: {{metrics.success_rate}}% (target: ≥99.5%)
+      Pub/Sub Latency: {{captured.pubsub_latency_ms}}ms (target: <250ms)
+      Tally Latency: {{captured.tally_latency_ms}}ms (target: <2s)
+      Details: {{execution_url}}
+
+  - type: log
+    path: .kiro/logs/nightly-probe-{date}.log
+    format: json
+
+on_failure:
+  retry:
+    max_attempts: 2
+    backoff: exponential
+  alert: slack_alerts_channel
+
+metadata:
+  author: kiro-automation
+  category: monitoring
+  tags: [sli, synthetic, e2e]
+  priority: high

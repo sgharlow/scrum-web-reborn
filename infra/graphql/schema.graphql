@@ -1,0 +1,231 @@
+# Scrum Reborn - GraphQL Schema
+# AppSync-powered real-time collaboration for distributed Scrum teams
+
+# ============================================================================
+# ENUMS
+# ============================================================================
+
+enum RoomStage {
+  PLANNING
+  VOTING
+  RETRO
+  COMPLETE
+}
+
+enum MemberRole {
+  MODERATOR
+  MEMBER
+  OBSERVER
+}
+
+enum MemberState {
+  ONLINE
+  AWAY
+  OFFLINE
+}
+
+enum RetroCategory {
+  WENT_WELL
+  TO_IMPROVE
+  ACTION_ITEMS
+}
+
+enum StoryStatus {
+  PENDING
+  ESTIMATED
+  SKIPPED
+}
+
+# ============================================================================
+# TYPES
+# ============================================================================
+
+type Room {
+  id: ID!
+  roomId: ID  # Alias for id, used for subscription filtering
+  name: String!
+  code: String!
+  stage: RoomStage!
+  currentStoryId: ID  # The story currently being voted on
+  createdBy: String!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Member {
+  userId: ID!
+  roomId: ID!
+  displayName: String!
+  role: MemberRole!
+  state: MemberState!
+  lastSeen: AWSDateTime!
+}
+
+type Story {
+  id: ID!
+  roomId: ID!
+  title: String!
+  description: String
+  voteCount: Int!
+  avgVote: Float
+  revealed: Boolean!
+  status: StoryStatus!
+  tags: [String!]
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Vote {
+  userId: ID!
+  storyId: ID!
+  roomId: ID!
+  value: String!
+  createdAt: AWSDateTime!
+}
+
+type RetroNote {
+  id: ID!
+  roomId: ID!
+  category: RetroCategory!
+  text: String!
+  authorId: ID!
+  votes: Int!
+  createdAt: AWSDateTime!
+}
+
+# ============================================================================
+# PAGINATION
+# ============================================================================
+
+type StoryConnection {
+  items: [Story!]!
+  nextToken: String
+}
+
+type RetroConnection {
+  items: [RetroNote!]!
+  nextToken: String
+}
+
+type RoomConnection {
+  items: [Room!]!
+  nextToken: String
+}
+
+# ============================================================================
+# MUTATIONS
+# ============================================================================
+
+type Mutation {
+  # Room operations
+  createRoom(name: String!, code: String!): Room!
+  setRoomStage(roomId: ID!, stage: RoomStage!, currentStoryId: ID): Room!
+  joinRoom(code: String!, displayName: String!, role: MemberRole): Member!
+  leaveRoom(roomId: ID!): Boolean!
+  
+  # Presence operations
+  setPresence(roomId: ID!, state: MemberState): Member!
+  
+  # Story operations
+  createStory(roomId: ID!, title: String!, description: String, tags: [String!]): Story!
+  updateStory(roomId: ID!, storyId: ID!, title: String, description: String, tags: [String!], status: StoryStatus): Story!
+  deleteStory(roomId: ID!, storyId: ID!): Boolean!
+  
+  # Voting operations
+  castVote(roomId: ID!, storyId: ID!, value: String!): Vote!
+  retractVote(roomId: ID!, storyId: ID!): Boolean!
+  revealVotes(roomId: ID!, storyId: ID!): Story!
+  
+  # Retro operations
+  addRetroNote(roomId: ID!, category: RetroCategory!, text: String!): RetroNote!
+  voteRetroNote(roomId: ID!, noteId: ID!, delta: Int!): RetroNote!
+}
+
+# ============================================================================
+# QUERIES
+# ============================================================================
+
+type Query {
+  # Room queries
+  getRoom(id: ID!): Room
+  getRoomByCode(code: String!): Room
+  listRooms(limit: Int, nextToken: String): RoomConnection!
+  
+  # Story queries
+  getStory(roomId: ID!, storyId: ID!): Story
+  listStories(roomId: ID!, limit: Int, nextToken: String): StoryConnection!
+  
+  # Retro queries
+  listRetro(roomId: ID!, limit: Int, nextToken: String): RetroConnection!
+  
+  # Presence queries
+  listPresence(roomId: ID!): [Member!]!
+}
+
+# ============================================================================
+# SUBSCRIPTIONS
+# ============================================================================
+
+type Subscription {
+  # Subscribe to room creation
+  onRoomCreated(roomId: ID!): Room
+    @aws_subscribe(mutations: ["createRoom"])
+  
+  # Subscribe to stage changes
+  onStageChanged(roomId: ID!): Room
+    @aws_subscribe(mutations: ["setRoomStage"])
+  
+  # Subscribe to member joining
+  onMemberJoined(roomId: ID!): Member
+    @aws_subscribe(mutations: ["joinRoom"])
+  
+  # Subscribe to member leaving
+  onMemberLeft(roomId: ID!): Boolean
+    @aws_subscribe(mutations: ["leaveRoom"])
+  
+  # Subscribe to presence updates
+  onPresenceChanged(roomId: ID!): Member
+    @aws_subscribe(mutations: ["setPresence"])
+  
+  # Subscribe to story creation
+  onStoryCreated(roomId: ID!): Story
+    @aws_subscribe(mutations: ["createStory"])
+  
+  # Subscribe to story updates
+  onStoryUpdated(roomId: ID!): Story
+    @aws_subscribe(mutations: ["updateStory"])
+  
+  # Subscribe to story deletion
+  onStoryDeleted(roomId: ID!): Boolean
+    @aws_subscribe(mutations: ["deleteStory"])
+  
+  # Subscribe to vote casting
+  onVoteCast(roomId: ID!, storyId: ID): Vote
+    @aws_subscribe(mutations: ["castVote"])
+  
+  # Subscribe to vote retraction
+  onVoteRetracted(roomId: ID!, storyId: ID): Boolean
+    @aws_subscribe(mutations: ["retractVote"])
+  
+  # Subscribe to votes revealed
+  onVotesRevealed(roomId: ID!, storyId: ID): Story
+    @aws_subscribe(mutations: ["revealVotes"])
+  
+  # Subscribe to retro note addition
+  onRetroNoteAdded(roomId: ID!): RetroNote
+    @aws_subscribe(mutations: ["addRetroNote"])
+  
+  # Subscribe to retro note voting
+  onRetroNoteVoted(roomId: ID!): RetroNote
+    @aws_subscribe(mutations: ["voteRetroNote"])
+}
+
+# ============================================================================
+# SCHEMA
+# ============================================================================
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}

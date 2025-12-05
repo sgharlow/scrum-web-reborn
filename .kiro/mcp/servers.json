@@ -1,0 +1,176 @@
+{
+  "$schema": "https://kiro.dev/schemas/mcp-servers.json",
+  "version": "1.0",
+  "description": "Model Context Protocol server configurations for Scrum Reborn integrations",
+  "servers": [
+    {
+      "id": "domo",
+      "name": "Domo Business Intelligence",
+      "type": "http",
+      "enabled": true,
+      "baseUrl": "https://api.domo.com",
+      "authentication": {
+        "type": "bearer",
+        "tokenSource": "env:DOMO_ACCESS_TOKEN"
+      },
+      "endpoints": {
+        "datasets": "/v2/datasets",
+        "dataUpload": "/v2/datasets/{datasetId}/data",
+        "query": "/v1/datasets/query/execute/{datasetId}"
+      },
+      "rateLimits": {
+        "requestsPerMinute": 60,
+        "requestsPerHour": 1000
+      },
+      "timeout": 30000,
+      "retry": {
+        "maxAttempts": 3,
+        "backoff": "exponential"
+      },
+      "description": "Push SLI metrics and engagement data to Domo for dashboards",
+      "tags": ["analytics", "metrics", "bi"]
+    },
+    {
+      "id": "slack",
+      "name": "Slack Notifications",
+      "type": "webhook",
+      "enabled": true,
+      "baseUrl": "https://hooks.slack.com/services",
+      "authentication": {
+        "type": "none"
+      },
+      "endpoints": {
+        "alerts": "env:SLACK_ALERTS_WEBHOOK_PATH",
+        "deployments": "env:SLACK_DEPLOY_WEBHOOK_PATH"
+      },
+      "timeout": 10000,
+      "description": "Send alerts and deployment notifications to Slack channels",
+      "tags": ["notifications", "alerts"]
+    },
+    {
+      "id": "aws-cloudwatch",
+      "name": "AWS CloudWatch",
+      "type": "aws-sdk",
+      "enabled": true,
+      "service": "CloudWatch",
+      "authentication": {
+        "type": "aws-iam",
+        "roleArn": "env:AWS_CLOUDWATCH_ROLE_ARN"
+      },
+      "region": "us-east-1",
+      "endpoints": {
+        "putMetricData": "PutMetricData",
+        "getMetricStatistics": "GetMetricStatistics"
+      },
+      "timeout": 15000,
+      "description": "Publish custom metrics and query monitoring data",
+      "tags": ["monitoring", "aws", "metrics"]
+    },
+    {
+      "id": "appsync-api",
+      "name": "AppSync GraphQL API",
+      "type": "graphql",
+      "enabled": true,
+      "baseUrl": "env:APPSYNC_GRAPHQL_URL",
+      "authentication": {
+        "type": "cognito",
+        "userPoolId": "env:COGNITO_USER_POOL_ID",
+        "clientId": "env:COGNITO_CLIENT_ID"
+      },
+      "endpoints": {
+        "graphql": "/graphql",
+        "realtime": "/graphql/realtime"
+      },
+      "websocket": {
+        "enabled": true,
+        "protocol": "graphql-ws"
+      },
+      "timeout": 30000,
+      "description": "Main application API for rooms, stories, votes, and retro",
+      "tags": ["api", "graphql", "realtime"]
+    },
+    {
+      "id": "dynamodb-streams",
+      "name": "DynamoDB Streams",
+      "type": "aws-sdk",
+      "enabled": true,
+      "service": "DynamoDBStreams",
+      "authentication": {
+        "type": "aws-iam",
+        "roleArn": "env:AWS_DYNAMODB_ROLE_ARN"
+      },
+      "region": "us-east-1",
+      "endpoints": {
+        "getRecords": "GetRecords",
+        "describeStream": "DescribeStream"
+      },
+      "timeout": 10000,
+      "description": "Process vote tally updates and presence cleanup events",
+      "tags": ["database", "streaming", "aws"]
+    },
+    {
+      "id": "github-api",
+      "name": "GitHub API",
+      "type": "http",
+      "enabled": false,
+      "baseUrl": "https://api.github.com",
+      "authentication": {
+        "type": "bearer",
+        "tokenSource": "env:GITHUB_TOKEN"
+      },
+      "endpoints": {
+        "repos": "/repos/{owner}/{repo}",
+        "issues": "/repos/{owner}/{repo}/issues",
+        "deployments": "/repos/{owner}/{repo}/deployments"
+      },
+      "rateLimits": {
+        "requestsPerHour": 5000
+      },
+      "timeout": 15000,
+      "description": "Create deployment events and link commits to features (future)",
+      "tags": ["ci-cd", "git"]
+    }
+  ],
+  "globalSettings": {
+    "defaultTimeout": 30000,
+    "defaultRetry": {
+      "maxAttempts": 3,
+      "backoff": "exponential",
+      "initialDelay": 1000,
+      "maxDelay": 10000
+    },
+    "logging": {
+      "level": "info",
+      "destination": ".kiro/logs/mcp-{date}.log"
+    },
+    "errorHandling": {
+      "mode": "graceful",
+      "fallback": "log-and-continue"
+    }
+  },
+  "environments": {
+    "development": {
+      "overrides": {
+        "domo.enabled": false,
+        "slack.enabled": false,
+        "globalSettings.logging.level": "debug"
+      }
+    },
+    "staging": {
+      "overrides": {
+        "appsync-api.baseUrl": "env:APPSYNC_STAGING_URL"
+      }
+    },
+    "production": {
+      "overrides": {
+        "globalSettings.logging.level": "warn",
+        "globalSettings.errorHandling.mode": "strict"
+      }
+    }
+  },
+  "metadata": {
+    "createdAt": "2025-11-13",
+    "author": "kiro-automation",
+    "version": "1.0.0"
+  }
+}

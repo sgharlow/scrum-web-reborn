@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Test Tracking Logger",
+  "description": "Monitors all code changes to track interfaces within and between core features, maintaining a todo-tests.md file with items requiring testing before production",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the recent changes to identify:\n1. New or modified interfaces between core features (components, hooks, state management, types)\n2. API contracts that have changed (GraphQL mutations, queries, subscriptions)\n3. Event handling patterns that were added or modified\n4. Integration points that need testing (AppSync, DynamoDB, authentication)\n5. Component interactions that require validation\n\nUpdate the todo-tests.md file with:\n- Clear test items organized by feature area\n- Priority levels (Critical/High/Medium/Low) based on user impact\n- Dependencies between test items\n- Acceptance criteria for each test\n- Mark completed items when tests are implemented\n\nFocus on the reliability commitments from the foundation: join success rate, pub/sub latency, presence freshness, and vote tally latency. Ensure all interface changes that could impact these SLIs are tracked for testing."
+  }
+}

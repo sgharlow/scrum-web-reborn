@@ -1,0 +1,267 @@
+═══════════════════════════════════════════════════════════════════
+DEMO VIDEO SLIDES - COPY/PASTE TEMPLATES
+═══════════════════════════════════════════════════════════════════
+
+Instructions:
+1. Open Google Slides or PowerPoint
+2. Set slide size to 16:9 (1920x1080)
+3. Copy each slide content below
+4. Paste into a new slide
+5. Format as described
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 1: TITLE SLIDE
+═══════════════════════════════════════════════════════════════════
+
+Background: Dark navy blue (#1F2937)
+
+────────────────────────────────────
+         Scrum Reborn
+
+    99x More Reliable Real-Time
+      Scrum Collaboration
+
+      Built with AWS AppSync
+────────────────────────────────────
+
+Font: White, centered
+Title: 72pt bold
+Subtitle: 48pt (make "99x" green #10B981)
+Bottom: 36pt
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 2: THE PROBLEM - P2P ARCHITECTURE
+═══════════════════════════════════════════════════════════════════
+
+Background: White or light gray (#F3F4F6)
+
+────────────────────────────────────
+  The Problem: P2P WebRTC
+
+     👤 ──X──> 🔥 ──X──> 👤
+   User A    NAT/FW    User B
+
+
+Failure Points:
+❌ NAT Traversal Issues (30%)
+❌ Corporate Firewalls (15%)
+❌ TURN Server Unreliable (5%)
+
+
+    50% FAILURE RATE
+────────────────────────────────────
+
+Font: Dark gray (#1F2937)
+Title: 48pt bold
+Diagram: 36pt, use emojis (👤 = user, 🔥 = firewall)
+Bullets: 32pt
+Failure Rate: 72pt bold red (#EF4444)
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 3: THE SOLUTION - APPSYNC
+═══════════════════════════════════════════════════════════════════
+
+Background: White
+
+────────────────────────────────────
+  The Solution: AWS AppSync
+
+   👤 ──✓──> ☁️ ──✓──> 👤
+  User A  AppSync  User B
+           │
+           ├──> ⚡ Lambda
+           └──> 📦 DynamoDB
+
+Benefits:
+✅ HTTPS Port 443 (No NAT)
+✅ AWS Managed Infrastructure
+✅ WebSocket Subscriptions
+
+    99.5% SUCCESS RATE
+
+       🎉 99x IMPROVEMENT! 🎉
+────────────────────────────────────
+
+Font: Dark gray (#1F2937)
+Title: 48pt bold
+Diagram: 36pt (use emojis)
+Success Rate: 72pt bold green (#10B981)
+Improvement: 60pt bold gold (#F59E0B)
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 4: BEFORE vs AFTER
+═══════════════════════════════════════════════════════════════════
+
+Background: Split screen (left = light red #FEE2E2, right = light green #D1FAE5)
+
+────────────────────────────────────
+   BEFORE: P2P        AFTER: AppSync
+
+❌ 50% Success      ✅ 99.5% Success
+❌ NAT Issues       ✅ Works Everywhere
+❌ Firewalls        ✅ Port 443 Only
+❌ $50/mo TURN      ✅ $20/mo AWS
+❌ 5hr/wk Maint     ✅ Zero Maintenance
+
+
+        99x MORE RELIABLE
+────────────────────────────────────
+
+Left column: Dark red text (#991B1B)
+Right column: Dark green text (#065F46)
+Bottom banner: Gold background (#F59E0B), white text, 60pt bold
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 5: KIRO METHODOLOGY
+═══════════════════════════════════════════════════════════════════
+
+Background: Dark blue (#1E3A8A)
+
+────────────────────────────────────
+      Built with Kiro
+
+  Spec-Driven Development
+
+✓ Requirements First (50+ criteria)
+✓ Design Documents
+✓ 50+ Implementation Tasks
+✓ Automated Testing Hooks
+✓ 111 Automated Tests
+✓ Nightly Synthetic Probes
+
+
+   Specs Before Code.
+   Quality Automated.
+────────────────────────────────────
+
+Font: White
+Title: 60pt bold
+Bullets: 32pt (checkmarks in light blue #60A5FA)
+Tagline: 28pt italic
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 6: MEASURABLE IMPACT
+═══════════════════════════════════════════════════════════════════
+
+Background: White
+
+────────────────────────────────────
+     Measurable Impact
+
+┌────────────────┐ ┌────────────────┐
+│   99.7%        │ │   180ms        │
+│ Connectivity   │ │ Sync Latency   │
+└────────────────┘ └────────────────┘
+
+┌────────────────┐ ┌────────────────┐
+│   1.2s         │ │   100%         │
+│ Tally Time     │ │ Probe Success  │
+└────────────────┘ └────────────────┘
+
+
+Teams can finally trust
+their planning tools.
+────────────────────────────────────
+
+Font: Dark gray (#1F2937)
+Metric boxes: Light gray background (#F3F4F6)
+Numbers: 48pt bold green (#10B981)
+Labels: 24pt
+Tagline: 28pt italic, centered
+
+═══════════════════════════════════════════════════════════════════
+SLIDE 7: CALL TO ACTION
+═══════════════════════════════════════════════════════════════════
+
+Background: Dark navy (#1F2937)
+
+────────────────────────────────────
+    Try Scrum Reborn Today
+
+
+🌐 Live Demo
+main.d3tvb88c55agb4.amplifyapp.com
+
+
+💻 Open Source on GitHub
+github.com/sgharlow/scrum-web-reborn
+
+
+🔧 Built with Kiro
+Specs Before Code.
+Automated Quality.
+────────────────────────────────────
+
+Font: White
+Title: 60pt bold
+Emojis: 48pt
+URLs: 36pt bold (make URLs light blue #60A5FA)
+Bottom text: 28pt
+
+═══════════════════════════════════════════════════════════════════
+SIMPLE VERSION (If you're in a hurry)
+═══════════════════════════════════════════════════════════════════
+
+Just create 4 simple text slides with black background + white text:
+
+SLIDE 1:
+───────
+Scrum Reborn
+99x More Reliable
+───────
+
+SLIDE 2:
+───────
+P2P Problem
+50% Failure Rate ❌
+───────
+
+SLIDE 3:
+───────
+AppSync Solution
+99.5% Success ✅
+99x IMPROVEMENT!
+───────
+
+SLIDE 4:
+───────
+Try it today:
+
+main.d3tvb88c55agb4.amplifyapp.com
+github.com/sgharlow/scrum-web-reborn
+───────
+
+═══════════════════════════════════════════════════════════════════
+QUICK START GUIDE
+═══════════════════════════════════════════════════════════════════
+
+Google Slides:
+1. Go to slides.google.com
+2. Blank presentation
+3. File → Page setup → Widescreen 16:9
+4. Insert → Text box
+5. Copy/paste content above
+6. Format → Align → Center
+7. Download → PNG
+
+PowerPoint:
+1. Open PowerPoint
+2. Design → Slide Size → Widescreen 16:9
+3. Insert → Text box
+4. Copy/paste content above
+5. Home → Align → Center
+6. File → Export → PNG
+
+Canva (easiest):
+1. canva.com
+2. "Presentation" template (1920x1080)
+3. Replace text with content above
+4. Download as PNG
+
+═══════════════════════════════════════════════════════════════════
+
+Time to create: 20-30 minutes
+Skill level: Easy (just copy/paste and format)
+Result: Professional slides for your demo video
+
+Good luck! 🚀

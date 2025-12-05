@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Auto Commit (30min)",
+  "description": "Automatically commits all changes after a prompt completes, but only if at least 30 minutes have elapsed since the last commit",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check if 30 minutes have passed since the last git commit. If yes, commit all current changes with a descriptive commit message summarizing the recent work. If no, skip the commit. Use git commands to check the last commit time and perform the commit if needed."
+  }
+}

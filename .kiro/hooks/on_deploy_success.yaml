@@ -1,0 +1,80 @@
+name: on_deploy_success
+description: "Post-deployment validation and smoke tests"
+version: 1
+
+trigger:
+  type: event
+  event: cdk.deploy.complete
+  filters:
+    - "stack_name == 'ScrumRealtimeStack'"
+    - "status == 'success'"
+
+environment:
+  STACK_NAME: ScrumRealtimeStack
+  AWS_REGION: "{{env.AWS_REGION || 'us-east-1'}}"
+
+actions:
+  - name: fetch_stack_outputs
+    description: "Get deployed endpoint URLs and IDs"
+    command: |
+      aws cloudformation describe-stacks \
+        --stack-name $STACK_NAME \
+        --region $AWS_REGION \
+        --query 'Stacks[0].Outputs' \
+        --output json > .kiro/cache/stack-outputs.json
+    capture:
+      graphql_url: "$(jq -r '.[] | select(.OutputKey==\"GraphqlUrl\") | .OutputValue' .kiro/cache/stack-outputs.json)"
+      user_pool_id: "$(jq -r '.[] | select(.OutputKey==\"UserPoolId\") | .OutputValue' .kiro/cache/stack-outputs.json)"
+    on_failure: halt_pipeline
+
+  - name: smoke_test_api
+    description: "Verify AppSync API is reachable"
+    command: |
+      curl -f -s -o /dev/null -w "%{http_code}" "{{captured.graphql_url}}"
+    assert:
+      - "exit_code == 0"
+      - "output =~ /200|401/"  # 401 is OK (auth required)
+    timeout: 10s
+    on_failure: rollback_deployment
+
+  - name: run_quick_integration_test
+    description: "Minimal integration test suite"
+    command: npm run test:integration:quick --prefix infra
+    timeout: 60s
+    on_failure: warn_and_alert
+
+  - name: update_frontend_config
+    description: "Update frontend environment with new endpoints"
+    script: |
+      cat > .env.production <<EOF
+      VITE_GRAPHQL_ENDPOINT={{captured.graphql_url}}
+      VITE_COGNITO_USER_POOL_ID={{captured.user_pool_id}}
+      VITE_COGNITO_CLIENT_ID={{captured.client_id}}
+      EOF
+    on_failure: warn_only
+
+  - name: notify_deployment_success
+    type: notification
+    channel: slack
+    message: |
+      ✅ Scrum Reborn deployed successfully!
+      Stack: {{env.STACK_NAME}}
+      Region: {{env.AWS_REGION}}
+      GraphQL: {{captured.graphql_url}}
+      Deployed at: {{timestamp}}
+
+outputs:
+  - type: file
+    path: .kiro/cache/last-deployment.json
+    content: |
+      {
+        "timestamp": "{{timestamp}}",
+        "stack_name": "{{env.STACK_NAME}}",
+        "graphql_url": "{{captured.graphql_url}}",
+        "status": "success"
+      }
+
+metadata:
+  author: kiro-automation
+  category: deployment
+  tags: [ci-cd, smoke-test]

@@ -1,0 +1,146 @@
+version: 1
+description: "Scrum Reborn - Domain model for real-time collaborative planning and retrospectives"
+
+# Core Entities
+entities:
+  Room:
+    description: "A collaborative session space for planning or retro"
+    attributes:
+      id: uuid
+      name: string
+      code: string          # 6-char join code (e.g., "FALCON")
+      stage: enum[PLANNING, VOTING, RETRO, CLOSED]
+      sprint: string?       # Sprint identifier (e.g., "2025-11")
+      createdBy: userId
+      createdAt: datetime
+      updatedAt: datetime
+    invariants:
+      - "code must be unique and 6 characters"
+      - "stage transitions: PLANNING -> VOTING -> RETRO -> CLOSED"
+    access_patterns:
+      - "Get room by ID"
+      - "Get room by code (join flow)"
+      - "List rooms by creator"
+
+  Member:
+    description: "A participant in a room session"
+    attributes:
+      userId: userId
+      roomId: uuid
+      displayName: string
+      role: enum[MODERATOR, MEMBER, OBSERVER]
+      state: enum[ONLINE, AWAY, OFFLINE]
+      lastSeen: datetime
+      ttl: int             # Auto-expire stale presence (90s)
+    invariants:
+      - "displayName required for all members"
+      - "ttl ensures zombie cleanup"
+    access_patterns:
+      - "List members by room"
+      - "Get member presence by userId + roomId"
+
+  Story:
+    description: "A user story to be estimated during planning"
+    attributes:
+      id: uuid
+      roomId: uuid
+      title: string
+      description: string?
+      status: string       # "todo", "estimated", "done"
+      tags: string[]
+      createdBy: userId
+      createdAt: datetime
+      updatedAt: datetime
+      voteCount: int       # Aggregate - updated by tally processor
+      avgVote: number?     # Aggregate - updated by tally processor
+      revealed: boolean    # Whether votes are visible
+    invariants:
+      - "title required and non-empty"
+      - "voteCount and avgVote computed asynchronously"
+    access_patterns:
+      - "List stories by room"
+      - "Get story by ID"
+      - "Update story attributes"
+
+  Vote:
+    description: "A single participant's estimate for a story"
+    attributes:
+      id: string           # Composite: storyId:userId
+      roomId: uuid
+      storyId: uuid
+      userId: userId
+      value: string        # "1", "2", "3", "5", "8", "13", "☕", "❓"
+      createdAt: datetime
+    invariants:
+      - "One vote per user per story (upsert pattern)"
+      - "value must be from Fibonacci or special cards"
+    access_patterns:
+      - "List votes by story (for reveal)"
+      - "Get vote by userId + storyId"
+
+  RetroNote:
+    description: "A retrospective note in a specific category"
+    attributes:
+      id: uuid
+      roomId: uuid
+      category: enum[START, STOP, CONTINUE, KUDOS, ISSUE]
+      text: string
+      authorId: userId
+      createdAt: datetime
+      votes: int           # Dot voting count
+    invariants:
+      - "text required and non-empty"
+      - "votes non-negative"
+    access_patterns:
+      - "List notes by room and category"
+      - "Update votes by note ID"
+
+# Service Level Indicators (SLIs)
+slis:
+  connectivity_success_rate:
+    description: "% of join attempts that successfully connect"
+    target: ">= 99.5"
+    measurement: "joinRoom success / total attempts"
+
+  pubsub_latency_p95:
+    description: "95th percentile mutation-to-subscription delivery time"
+    target: "<= 250ms"
+    measurement: "Time from mutation response to subscription event"
+
+  presence_freshness:
+    description: "Max staleness of presence data"
+    target: "<= 30s"
+    measurement: "lastSeen age for ONLINE members"
+
+  vote_tally_latency_p95:
+    description: "95th percentile time to update story aggregates after vote"
+    target: "<= 2s"
+    measurement: "Time from castVote to avgVote update"
+
+# Data Integrity Constraints
+constraints:
+  - name: "Room code uniqueness"
+    rule: "No two active rooms can share a code"
+    enforcement: "DynamoDB conditional write"
+
+  - name: "Vote idempotency"
+    rule: "Duplicate vote submissions result in same state"
+    enforcement: "Upsert pattern with composite key"
+
+  - name: "Presence auto-expiry"
+    rule: "Stale presence records auto-delete via TTL"
+    enforcement: "DynamoDB TTL attribute"
+
+# Business Rules
+business_rules:
+  vote_reveal:
+    description: "Votes hidden until moderator reveals"
+    implementation: "Story.revealed flag, client-side filter"
+
+  moderator_privileges:
+    description: "Only moderators can change room stage, reveal votes"
+    implementation: "Lambda resolver checks role claim"
+
+  retro_voting:
+    description: "Participants can upvote retro notes for prioritization"
+    implementation: "Delta updates (+1/-1) with atomic ADD operation"

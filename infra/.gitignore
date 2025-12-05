@@ -1,0 +1,16 @@
+*.js
+!jest.config.js
+!esbuild.mjs
+*.d.ts
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Build output
+dist/
+
+# Lambda build artifacts
+lambda/**/index.js
+lambda/**/index.js.map

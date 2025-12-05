@@ -1,0 +1,189 @@
+version: 1
+description: "External integrations and data connectors for Scrum Reborn"
+
+connectors:
+  # ==================== METRICS & ANALYTICS ====================
+  domo:
+    type: bi_platform
+    description: "Business intelligence dashboards for SLI monitoring"
+    datasets:
+      room_kpis:
+        description: "Room-level key performance indicators"
+        fields:
+          - name: timestamp
+            type: datetime
+            description: "Event timestamp (UTC)"
+          - name: roomId
+            type: string
+            description: "Room identifier"
+          - name: metric
+            type: enum[join_success, join_failure, vote_cast, vote_revealed, stage_change]
+            description: "Event type"
+          - name: value
+            type: number
+            description: "Metric value (1 for counts, latency in ms)"
+          - name: metadata
+            type: json
+            description: "Additional context (e.g., error codes)"
+        refresh_schedule: every_15_min
+        retention: 90_days
+
+      sli_timeseries:
+        description: "Time-series SLI measurements for dashboards"
+        fields:
+          - name: timestamp
+            type: datetime
+          - name: sli_name
+            type: enum[connectivity_success_rate, pubsub_latency_p95, presence_freshness, vote_tally_latency_p95]
+          - name: value
+            type: number
+          - name: target
+            type: number
+          - name: status
+            type: enum[green, yellow, red]
+        refresh_schedule: every_5_min
+        retention: 365_days
+
+      user_engagement:
+        description: "User participation and engagement metrics"
+        fields:
+          - name: date
+            type: date
+          - name: userId
+            type: string
+          - name: roomsJoined
+            type: int
+          - name: storiesCreated
+            type: int
+          - name: votesCast
+            type: int
+          - name: retroNotesAdded
+            type: int
+          - name: sessionDurationMins
+            type: number
+        refresh_schedule: daily_at_0200_utc
+        retention: 365_days
+
+    authentication:
+      type: oauth2
+      token_source: env:DOMO_ACCESS_TOKEN
+
+    etl_pipeline:
+      source: dynamodb_streams
+      transform: lambda_aggregator
+      load: domo_api_v2
+      error_handling: dlq_with_retry
+
+  # ==================== MONITORING & OBSERVABILITY ====================
+  cloudwatch:
+    type: monitoring
+    description: "AWS CloudWatch for infrastructure and application metrics"
+    metrics:
+      appsync_api:
+        - 4XXError
+        - 5XXError
+        - Latency
+        - ConnectedChannels
+        - ActiveConnections
+
+      dynamodb_table:
+        - ConsumedReadCapacityUnits
+        - ConsumedWriteCapacityUnits
+        - ThrottledRequests
+        - StreamRecords
+
+      lambda_resolvers:
+        - Invocations
+        - Errors
+        - Duration
+        - ConcurrentExecutions
+        - Throttles
+
+    alarms:
+      high_error_rate:
+        metric: appsync_api.5XXError
+        threshold: "> 10 in 5 minutes"
+        action: sns_topic
+
+      high_latency:
+        metric: appsync_api.Latency
+        threshold: "p95 > 500ms"
+        action: sns_topic
+
+      dynamodb_throttling:
+        metric: dynamodb_table.ThrottledRequests
+        threshold: "> 0 in 1 minute"
+        action: auto_scale_capacity
+
+  # ==================== SYNTHETIC MONITORING ====================
+  synthetic_probe:
+    type: health_check
+    description: "Automated end-to-end tests to verify SLIs"
+    probes:
+      nightly_room_flow:
+        schedule: cron(0 7 * * ? *)  # 07:00 UTC daily
+        steps:
+          - action: createRoom
+            input: { name: "Probe Room", code: "PROBE1" }
+          - action: joinRoom
+            input: { roomCode: "PROBE1", displayName: "Probe Bot" }
+          - action: subscribe
+            channel: "room:{roomId}"
+            timeout_ms: 5000
+          - action: createStory
+            input: { title: "Probe Story" }
+          - action: waitForEvent
+            event: story.created
+            timeout_ms: 2000
+          - action: castVote
+            input: { value: "5" }
+          - action: waitForTallyUpdate
+            timeout_ms: 3000
+          - action: cleanup
+        success_criteria:
+          - "All steps complete without errors"
+          - "Total time < 15s"
+        on_failure:
+          - log_to_cloudwatch
+          - send_alert_to_slack
+          - write_metric_to_domo
+
+  # ==================== NOTIFICATIONS ====================
+  slack:
+    type: notification
+    description: "Slack alerts for critical errors and SLI breaches"
+    channels:
+      alerts:
+        webhook_url: env:SLACK_WEBHOOK_URL
+        events:
+          - sli_breach
+          - synthetic_probe_failure
+          - high_error_rate
+
+      deployments:
+        webhook_url: env:SLACK_DEPLOY_WEBHOOK
+        events:
+          - cdk_deploy_start
+          - cdk_deploy_success
+          - cdk_deploy_failure
+
+# Data export configs
+exports:
+  analytics_warehouse:
+    enabled: false  # Future: export to Snowflake/BigQuery
+    format: parquet
+    schedule: daily
+    partitioning: date
+
+# GDPR / Privacy
+privacy:
+  pii_fields:
+    - Member.displayName
+    - RetroNote.text
+  anonymization:
+    schedule: after_90_days
+    strategy: hash_with_salt
+  data_subject_requests:
+    export: supported
+    delete: supported
+    response_time: "< 30 days"

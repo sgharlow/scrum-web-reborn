@@ -1,0 +1,228 @@
+version: 1
+description: "User flows and event choreography for Scrum Reborn"
+
+flows:
+  # ==================== ROOM LIFECYCLE ====================
+  create_room:
+    description: "Facilitator creates a new planning/retro room"
+    trigger: user_action
+    input:
+      name: string
+      code: string        # 6-char code (e.g., "FALCON")
+      sprint: string?
+    steps:
+      - validate_code_uniqueness
+      - create_room_record
+      - auto_join_as_moderator
+    output: Room
+    publishes:
+      - event: room.created
+        channel: rooms
+    sli_impact: connectivity_success_rate
+    error_handling:
+      duplicate_code: "Return friendly error, suggest alternative"
+
+  join_room:
+    description: "Participant joins via room code"
+    trigger: user_action
+    input:
+      roomCode: string
+      displayName: string
+      role: enum[MEMBER, OBSERVER] = MEMBER
+    steps:
+      - lookup_room_by_code
+      - create_presence_record_with_ttl
+      - subscribe_to_room_events
+    output: Member
+    publishes:
+      - event: presence.heartbeat
+        channel: "room:{roomId}"
+        payload: Member
+    sli_impact: connectivity_success_rate
+    error_handling:
+      room_not_found: "Display 'Invalid code' message"
+      connection_timeout: "Retry with exponential backoff"
+    success_criteria:
+      - "User sees participant list within 2s"
+      - "User can send/receive events within 5s"
+
+  heartbeat_presence:
+    description: "Client sends periodic heartbeat to maintain presence"
+    trigger: interval(30s)
+    input:
+      roomId: uuid
+      state: enum[ONLINE, AWAY]
+    steps:
+      - upsert_presence_with_fresh_ttl
+    output: Member
+    publishes:
+      - event: presence.heartbeat
+        channel: "room:{roomId}"
+    sli_impact: presence_freshness
+
+  leave_room:
+    description: "Participant explicitly leaves or times out"
+    trigger: user_action | ttl_expiry
+    input:
+      roomId: uuid
+    steps:
+      - delete_presence_record
+      - cleanup_subscriptions
+    output: boolean
+    publishes:
+      - event: presence.offline
+        channel: "room:{roomId}"
+
+  # ==================== PLANNING WORKFLOW ====================
+  planning_create_story:
+    description: "Add a user story to the backlog"
+    trigger: user_action
+    input:
+      roomId: uuid
+      title: string
+      description: string?
+      tags: string[]?
+    steps:
+      - validate_room_stage_is_planning
+      - create_story_record
+    output: Story
+    publishes:
+      - event: story.created
+        channel: "room:{roomId}"
+    sli_impact: pubsub_latency_p95
+
+  planning_select_story:
+    description: "Moderator selects story for voting"
+    trigger: user_action
+    input:
+      roomId: uuid
+      storyId: uuid
+    steps:
+      - set_room_stage_to_voting
+      - set_current_story
+      - reset_votes
+    publishes:
+      - event: voting.started
+        channel: "room:{roomId}"
+        payload: { storyId, revealed: false }
+
+  voting_cast_vote:
+    description: "Participant submits estimate (hidden until reveal)"
+    trigger: user_action
+    input:
+      roomId: uuid
+      storyId: uuid
+      value: string       # "1", "2", "3", "5", "8", "13", "☕", "❓"
+    steps:
+      - upsert_vote_record
+      - trigger_tally_via_stream
+    output: Vote
+    publishes:
+      - event: vote.cast
+        channel: "room:{roomId}:story:{storyId}"
+        payload: { userId, hasVoted: true }  # Don't leak value until reveal
+    async_processing:
+      - tally_processor_recomputes_aggregates
+    sli_impact:
+      - pubsub_latency_p95
+      - vote_tally_latency_p95
+
+  voting_reveal:
+    description: "Moderator reveals all votes for current story"
+    trigger: user_action
+    input:
+      roomId: uuid
+      storyId: uuid
+    steps:
+      - set_story_revealed_true
+      - fetch_all_votes_and_aggregates
+    output: Story
+    publishes:
+      - event: votes.revealed
+        channel: "room:{roomId}:story:{storyId}"
+        payload: { votes: Vote[], avgVote, voteCount }
+    sli_impact: pubsub_latency_p95
+
+  voting_set_estimate:
+    description: "Moderator finalizes story estimate"
+    trigger: user_action
+    input:
+      storyId: uuid
+      estimate: string
+    steps:
+      - update_story_estimate
+      - return_to_planning_stage
+    output: Story
+    publishes:
+      - event: story.estimated
+        channel: "room:{roomId}"
+
+  # ==================== RETRO WORKFLOW ====================
+  retro_add_note:
+    description: "Add sticky note to retro board"
+    trigger: user_action
+    input:
+      roomId: uuid
+      category: enum[START, STOP, CONTINUE, KUDOS, ISSUE]
+      text: string
+    steps:
+      - validate_room_stage_is_retro
+      - create_retro_note
+    output: RetroNote
+    publishes:
+      - event: retro.added
+        channel: "room:{roomId}:retro"
+    sli_impact: pubsub_latency_p95
+
+  retro_vote_note:
+    description: "Dot voting on retro notes for prioritization"
+    trigger: user_action
+    input:
+      roomId: uuid
+      retroId: uuid
+      delta: int          # +1 or -1
+    steps:
+      - atomic_increment_votes
+    output: RetroNote
+    publishes:
+      - event: retro.voted
+        channel: "room:{roomId}:retro"
+    error_handling:
+      negative_votes: "Clamp at 0"
+
+  # ==================== STAGE TRANSITIONS ====================
+  transition_stage:
+    description: "Moderator moves room through stages"
+    trigger: user_action
+    input:
+      roomId: uuid
+      stage: enum[PLANNING, VOTING, RETRO, CLOSED]
+    steps:
+      - validate_stage_transition
+      - update_room_stage
+    output: Room
+    publishes:
+      - event: stage.changed
+        channel: "room:{roomId}"
+    business_rules:
+      valid_transitions:
+        - PLANNING -> VOTING
+        - VOTING -> PLANNING
+        - PLANNING -> RETRO
+        - RETRO -> CLOSED
+
+# Event choreography
+event_choreography:
+  vote.cast:
+    triggers:
+      - flow: tally_aggregates (async via DynamoDB Stream)
+
+  presence.offline:
+    triggers:
+      - flow: cleanup_stale_votes (if user was voting)
+
+# Critical path timing
+timing_budgets:
+  join_room_to_ready: "< 5s (p95)"
+  mutation_to_subscription: "< 250ms (p95)"
+  vote_to_tally_update: "< 2s (p95)"
