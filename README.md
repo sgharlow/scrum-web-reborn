@@ -1,3 +1,5 @@
+> 📦 **Archived** — Second iteration of the scrum web app (superseded scrum-web-app, itself archived), dormant since Mar 2026. Not maintained. Code and history remain browsable.
+
 # Scrum Reborn
 
 [![Amplify Status](https://img.shields.io/badge/amplify-deployed-green)](https://main.d3tvb88c55agb4.amplifyapp.com)
